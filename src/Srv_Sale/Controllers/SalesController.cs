@@ -26,12 +26,9 @@ public class SalesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<SaleDto>>> GetAllSales()
     {
-        var sales = await _context.Sales
-            .Include(x => x.Item)
-            .OrderBy(x => x.Item.Brand)
-            .ToListAsync();
+        var query = _context.Sales.OrderBy(x => x.Item.Brand).AsQueryable();
 
-        return _mapper.Map<List<SaleDto>>(sales);
+        return await query.ProjectTo<SaleDto>(_mapper.ConfigurationProvider).ToListAsync();
     }
 
     [HttpGet("{id}")]
