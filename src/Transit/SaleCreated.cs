@@ -1,6 +1,8 @@
-namespace Srv_Sale.DTOs;
+using System;
 
-public class SaleDto
+namespace Transit;
+
+public class SaleCreated
 {
     //Sale.cs
     public Guid Id { get; set; }
@@ -12,6 +14,4 @@ public class SaleDto
     public string Model { get; set; }
     public int Year { get; set; }
     public string ImageUrl { get; set; }
-
-    //exoport src/Transit/SaleCreated.cs
 }

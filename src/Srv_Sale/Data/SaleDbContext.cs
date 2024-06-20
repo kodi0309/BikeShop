@@ -1,4 +1,5 @@
 using Srv_Sale.Models;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Srv_Sale.Data
@@ -10,5 +11,14 @@ namespace Srv_Sale.Data
         }
 
         public DbSet<Sale> Sales { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.AddInboxStateEntity();
+            modelBuilder.AddOutboxMessageEntity();
+            modelBuilder.AddOutboxStateEntity();
+        }
     }
 }

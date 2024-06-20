@@ -6,6 +6,8 @@ using AutoMapper.QueryableExtensions;
 using Srv_Sale.Data;
 using Srv_Sale.Models;
 using Srv_Sale.DTOs;
+using Transit;
+using MassTransit;
 
 
 namespace Srv_Sale.Controllers;
@@ -16,11 +18,13 @@ public class SalesController : ControllerBase
 {
     private readonly SaleDbContext _context;
     private readonly IMapper _mapper;
+    private readonly IPublishEndpoint _publishEndpoint;
 
-    public SalesController(SaleDbContext context, IMapper mapper)
+    public SalesController(SaleDbContext context, IMapper mapper, IPublishEndpoint publishEndpoint)
     {
         _context = context;
         _mapper = mapper;
+        _publishEndpoint = publishEndpoint;
     }
 
     [HttpGet]
@@ -50,10 +54,15 @@ public class SalesController : ControllerBase
 
         _context.Sales.Add(sale);
 
+        var newSale = _mapper.Map<SaleDto>(sale);
+
+        await _publishEndpoint.Publish(_mapper.Map<SaleCreated>(newSale));
+
         var result = await _context.SaveChangesAsync() > 0;
+
         if (!result) return BadRequest("Changes not saved");
 
-        return CreatedAtAction(nameof(GetSaleById), new { sale.Id }, _mapper.Map<SaleDto>(sale));
+        return CreatedAtAction(nameof(GetSaleById), new { sale.Id }, newSale);
     }
 
     [HttpPut("{id}")]
@@ -69,6 +78,8 @@ public class SalesController : ControllerBase
         sale.Item.Year = updateSaleDto.Year != default ? updateSaleDto.Year : sale.Item.Year;
         sale.Item.ImageUrl = updateSaleDto.ImageUrl ?? sale.Item.ImageUrl;
 
+        await _publishEndpoint.Publish(_mapper.Map<SaleUpdated>(sale));
+
         var result = await _context.SaveChangesAsync() > 0;
 
         if (result) return Ok();
@@ -83,6 +94,8 @@ public class SalesController : ControllerBase
         if (sale == null) return NotFound();
 
         _context.Sales.Remove(sale);
+
+        await _publishEndpoint.Publish<SaleDeleted>(new { Id = sale.Id.ToString() });
 
         var result = await _context.SaveChangesAsync() > 0;
         if (!result) return BadRequest("Could not delete item");
