@@ -29,7 +29,7 @@ public class SaleFinder : ControllerBase
         query = findProp.FilterBy switch
         {
             "new" => query.Match(x => x.Year > 2023),
-            _ => query.Match(x => x.Year <= 2023)
+            _ => query.Match(x => x.Year <= 2024)
         };
 
         query.PageNumber(findProp.PageNumber);

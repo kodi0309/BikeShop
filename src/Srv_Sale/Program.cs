@@ -2,6 +2,8 @@ using Srv_Sale.Data;
 using Srv_Sale;
 using Microsoft.EntityFrameworkCore;
 using MassTransit;
+using Npgsql;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,16 +37,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters.ValidateAudience = false;
         options.TokenValidationParameters.NameClaimType = "username";
     });
-builder.Services.AddScoped<IAuctionRepository, AuctionRepository>();
-builder.Services.AddGrpc();
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-
-app.UserAuthentication();
 app.UseAuthorization();
 
+app.MapControllers();
 app.MapControllers();
 
 try
