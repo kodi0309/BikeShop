@@ -46,11 +46,14 @@ public class SalesController : ControllerBase
 
         return _mapper.Map<SaleDto>(sale);
     }
-
+    //[Authorize]
     [HttpPost]
     public async Task<ActionResult<SaleDto>> CreateSale(NewSaleDto saleDto)
     {
         var sale = _mapper.Map<Sale>(saleDto);
+
+        //Seller
+        //sale.Seller = User.Identity.Name; //required, if login there is a name
 
         _context.Sales.Add(sale);
 
@@ -65,6 +68,7 @@ public class SalesController : ControllerBase
         return CreatedAtAction(nameof(GetSaleById), new { sale.Id }, newSale);
     }
 
+    //[Authorize]
     [HttpPut("{id}")]
     public async Task<ActionResult> UpdateSale(Guid id, UpdateSaleDto updateSaleDto)
     {
@@ -72,6 +76,9 @@ public class SalesController : ControllerBase
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (sale == null) return NotFound();
+
+        //Seller
+        //sale.Seller = User.Identity.Name; //required, if login there is a name
 
         sale.Item.Brand = updateSaleDto.Brand ?? sale.Item.Brand;
         sale.Item.Model = updateSaleDto.Model ?? sale.Item.Model;
@@ -86,6 +93,7 @@ public class SalesController : ControllerBase
         return BadRequest("Changes were not updated");
     }
 
+    //[Authorize]
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteSale(Guid id)
     {
@@ -93,6 +101,9 @@ public class SalesController : ControllerBase
 
         if (sale == null) return NotFound();
 
+        //Seller
+        //sale.Seller = User.Identity.Name; //required, if login there is a name
+        
         _context.Sales.Remove(sale);
 
         await _publishEndpoint.Publish<SaleDeleted>(new { Id = sale.Id.ToString() });
