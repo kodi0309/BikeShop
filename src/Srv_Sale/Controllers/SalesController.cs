@@ -30,87 +30,135 @@ public class SalesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<SaleDto>>> GetAllSales()
     {
-        var query = _context.Sales.OrderBy(x => x.Item.Brand).AsQueryable();
+        var sales = await _context.Sales
+            .Include(s => s.Item)
+            .OrderBy(x => x.Item.Brand)
+            .ToListAsync();
 
-        return await query.ProjectTo<SaleDto>(_mapper.ConfigurationProvider).ToListAsync();
+        var saleDtos = _mapper.Map<List<SaleDto>>(sales);
+
+        return saleDtos;
     }
+
+
 
     [HttpGet("{id}")]
     public async Task<ActionResult<SaleDto>> GetSaleById(Guid id)
     {
         var sale = await _context.Sales
-            .Include(x => x.Item)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .Include(s => s.Item)
+            .SingleOrDefaultAsync(s => s.Id == id);
 
-        if (sale == null) return NotFound();
+        if (sale == null)
+        {
+            return NotFound();
+        }
 
-        return _mapper.Map<SaleDto>(sale);
+        var saleDto = _mapper.Map<SaleDto>(sale);
+        return Ok(saleDto);
     }
-    //[Authorize]
     [HttpPost]
-    public async Task<ActionResult<SaleDto>> CreateSale(NewSaleDto saleDto)
+    public async Task<ActionResult<SaleDto>> CreateSale(NewSaleDto newSaleDto)
     {
-        var sale = _mapper.Map<Sale>(saleDto);
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
 
-        //Seller
-        //sale.Seller = User.Identity.Name; //required, if login there is a name
+        try
+        {
+            var sale = _mapper.Map<Sale>(newSaleDto);
 
-        _context.Sales.Add(sale);
-
-        var newSale = _mapper.Map<SaleDto>(sale);
-
-        await _publishEndpoint.Publish(_mapper.Map<SaleCreated>(newSale));
-
-        var result = await _context.SaveChangesAsync() > 0;
-
-        if (!result) return BadRequest("Changes not saved");
-
-        return CreatedAtAction(nameof(GetSaleById), new { sale.Id }, newSale);
+            _context.Sales.Add(sale);
+            await _context.SaveChangesAsync();
+            var saleDto = _mapper.Map<SaleDto>(sale);
+            return CreatedAtAction(nameof(GetSaleById), new { id = sale.Id }, saleDto);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Save ERROR: {ex.Message}");
+        }
     }
 
-    //[Authorize]
     [HttpPut("{id}")]
-    public async Task<ActionResult> UpdateSale(Guid id, UpdateSaleDto updateSaleDto)
+    public async Task<IActionResult> UpdateSale(Guid id, [FromBody] UpdateSaleDto updateSaleDto)
     {
-        var sale = await _context.Sales.Include(x => x.Item)
-            .FirstOrDefaultAsync(x => x.Id == id);
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
 
-        if (sale == null) return NotFound();
+        var sale = await _context.Sales
+            .Include(s => s.Item)
+            .FirstOrDefaultAsync(s => s.Id == id);
 
-        //Seller
-        //sale.Seller = User.Identity.Name; //required, if login there is a name
+        if (sale == null)
+        {
+            return NotFound();
+        }
 
-        sale.Item.Brand = updateSaleDto.Brand ?? sale.Item.Brand;
-        sale.Item.Model = updateSaleDto.Model ?? sale.Item.Model;
-        sale.Item.Year = updateSaleDto.Year != default ? updateSaleDto.Year : sale.Item.Year;
-        sale.Item.ImageUrl = updateSaleDto.ImageUrl ?? sale.Item.ImageUrl;
+        _mapper.Map(updateSaleDto, sale);
 
-        await _publishEndpoint.Publish(_mapper.Map<SaleUpdated>(sale));
+        // Ręczne mapowanie AdditionalProperties
+        sale.Item.AdditionalProperties = new ItemProperties
+        {
+            Frame = updateSaleDto.Frame,
+            Handlebar = updateSaleDto.Handlebar,
+            Brakes = updateSaleDto.Brakes,
+            WheelsTires = updateSaleDto.WheelsTires,
+            Seat = updateSaleDto.Seat,
+            DerailleursDrive = updateSaleDto.DerailleursDrive,
+            AdditionalAccessories = updateSaleDto.AdditionalAccessories
+        };
 
-        var result = await _context.SaveChangesAsync() > 0;
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!SaleExists(id))
+            {
+                return NotFound();
+            }
+            else
+            {
+                throw;
+            }
+        }
 
-        if (result) return Ok();
-        return BadRequest("Changes were not updated");
+        // Opcjonalne publikowanie zdarzenia
+        // await _publishEndpoint.Publish(new SaleUpdatedEvent { SaleId = sale.Id });
+
+        return NoContent();
     }
 
-    //[Authorize]
     [HttpDelete("{id}")]
-    public async Task<ActionResult> DeleteSale(Guid id)
+    public async Task<IActionResult> DeleteSale(Guid id)
     {
-        var sale = await _context.Sales.FindAsync(id);
+        var sale = await _context.Sales
+            .Include(s => s.Item)
+            .FirstOrDefaultAsync(s => s.Id == id);
 
-        if (sale == null) return NotFound();
+        if (sale == null)
+        {
+            return NotFound();
+        }
 
-        //Seller
-        //sale.Seller = User.Identity.Name; //required, if login there is a name
-        
         _context.Sales.Remove(sale);
+        await _context.SaveChangesAsync();
 
-        await _publishEndpoint.Publish<SaleDeleted>(new { Id = sale.Id.ToString() });
+        // Opcjonalne publikowanie zdarzenia
+        // await _publishEndpoint.Publish(new SaleDeletedEvent { SaleId = id });
 
-        var result = await _context.SaveChangesAsync() > 0;
-        if (!result) return BadRequest("Could not delete item");
-
-        return Ok();
+        return NoContent();
     }
+
+    private bool SaleExists(Guid id)
+    {
+        return _context.Sales.Any(e => e.Id == id);
+    }
+
+
+
 }

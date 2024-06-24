@@ -4,15 +4,26 @@ using Microsoft.EntityFrameworkCore;
 using MassTransit;
 using Npgsql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.Text.Json.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddNewtonsoftJson(options =>
+    {
+        options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
+        options.SerializerSettings.MaxDepth = 64;
+    });
 builder.Services.AddDbContext<SaleDbContext>(opt =>
 {
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    var dataSourceBuilder = new NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("DefaultConnection"));
+    dataSourceBuilder.UseJsonNet();
+    var dataSource = dataSourceBuilder.Build();
+    opt.UseNpgsql(dataSource);
 });
+
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 builder.Services.AddMassTransit(x =>
 {
@@ -49,7 +60,6 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 app.UseAuthorization();
 
-app.MapControllers();
 app.MapControllers();
 
 try
